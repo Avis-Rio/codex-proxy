@@ -25,7 +25,7 @@ auth:
 server:
   host: "::"
   port: 8080
-  proxy_api_key: pwd
+  proxy_api_key: 825bee0f31d7fe98f85de289
 session:
   ttl_minutes: 60
   cleanup_interval_minutes: 5

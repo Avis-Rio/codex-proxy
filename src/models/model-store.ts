@@ -139,10 +139,12 @@ function normalizeBackendModel(raw: BackendModelEntry): NormalizedModelWithMeta 
 
 /** Check if a model ID is Codex-compatible (gpt-X.Y-codex-*, bare gpt-X.Y, or gpt-oss-*). */
 function isCodexCompatibleId(id: string): boolean {
-  if (/^gpt-\d+(\.\d+)?-codex/.test(id)) return true;
-  if (/^gpt-\d+(\.\d+)?$/.test(id)) return true;
+  if (/^gpt-\d+(\.\d+)?(-[a-zA-Z0-9]+)*$/.test(id)) return true;
+  if (/^gpt-[a-zA-Z0-9-]+$/.test(id)) return true;
+  if (/^o\d+(-[a-zA-Z0-9]+)*$/.test(id)) return true;
+  if (/codex/.test(id)) return true;
   if (/^gpt-oss-/.test(id)) return true;
-  return false;
+  return true; // Simplified broad support for new models
 }
 
 /**
