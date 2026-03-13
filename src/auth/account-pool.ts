@@ -55,10 +55,21 @@ export class AccountPool {
     if (config.auth.jwt_token) {
       this.addAccount(config.auth.jwt_token);
     }
-    const envToken = process.env.CODEX_JWT_TOKEN;
-    if (envToken) {
-      this.addAccount(envToken);
-    }
+    // Load accounts from environment variables (supports CODEX_JWT_TOKEN, CODEX_JWT_TOKEN_1, etc.)
+    Object.keys(process.env).forEach((key) => {
+      if (key.startsWith("CODEX_JWT_TOKEN")) {
+        const val = process.env[key]?.trim();
+        if (val) {
+          // Supports comma-separated list of tokens in a single variable
+          val.split(",").forEach((token) => {
+            const t = token.trim();
+            if (t.startsWith("eyJ")) {
+              this.addAccount(t);
+            }
+          });
+        }
+      }
+    });
   }
 
   // ── Core operations ─────────────────────────────────────────────
