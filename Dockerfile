@@ -9,14 +9,13 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# 1) Backend deps (postinstall runs tsx scripts/setup-curl.ts)
+# 1) Backend deps
+# Skip postinstall during image build so Render doesn't fail on
+# downloading curl-impersonate from GitHub. The service can use the
+# system curl binary instead.
 COPY package*.json tsconfig.json ./
 COPY scripts/ scripts/
-RUN npm ci
-
-# Fail fast if curl-impersonate wasn't downloaded
-RUN test -f bin/curl-impersonate || \
-    (echo "FATAL: curl-impersonate not downloaded. Check network." && exit 1)
+RUN npm ci --ignore-scripts
 
 # 2) Web deps (separate layer for cache efficiency)
 COPY web/package*.json web/
