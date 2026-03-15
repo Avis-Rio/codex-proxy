@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
+import { adminFetch } from "../utils/admin-auth";
 
 export function useSettings() {
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -9,7 +10,7 @@ export function useSettings() {
 
   const load = useCallback(async () => {
     try {
-      const resp = await fetch("/admin/settings");
+      const resp = await adminFetch("/admin/settings");
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data: { proxy_api_key: string | null } = await resp.json();
       setApiKey(data.proxy_api_key);
@@ -25,14 +26,9 @@ export function useSettings() {
     setSaved(false);
     setError(null);
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      // Send current key for auth if one exists
-      if (apiKey) {
-        headers["Authorization"] = `Bearer ${apiKey}`;
-      }
-      const resp = await fetch("/admin/settings", {
+      const resp = await adminFetch("/admin/settings", {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ proxy_api_key: newKey }),
       });
       if (!resp.ok) {

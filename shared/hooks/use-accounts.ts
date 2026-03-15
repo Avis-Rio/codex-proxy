@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
 import type { Account } from "../types";
+import { adminFetch } from "../utils/admin-auth";
 
 export function useAccounts() {
   const [list, setList] = useState<Account[]>([]);
@@ -13,7 +14,7 @@ export function useAccounts() {
   const loadAccounts = useCallback(async () => {
     setRefreshing(true);
     try {
-      const resp = await fetch("/auth/accounts?quota=true");
+      const resp = await adminFetch("/auth/accounts?quota=true");
       const data = await resp.json();
       setList(data.accounts || []);
       setLastUpdated(new Date());
@@ -46,7 +47,7 @@ export function useAccounts() {
     setAddInfo("");
     setAddError("");
     try {
-      const resp = await fetch("/auth/login-start", { method: "POST" });
+      const resp = await adminFetch("/auth/login-start", { method: "POST" });
       const data = await resp.json();
       if (!resp.ok || !data.authUrl) {
         throw new Error(data.error || "failedStartLogin");
@@ -55,7 +56,7 @@ export function useAccounts() {
       setAddVisible(true);
 
       // Poll for new account + focus/visibility detection
-      const prevResp = await fetch("/auth/accounts");
+      const prevResp = await adminFetch("/auth/accounts");
       const prevData = await prevResp.json();
       const prevCount = prevData.accounts?.length || 0;
 
@@ -64,7 +65,7 @@ export function useAccounts() {
         if (checking) return;
         checking = true;
         try {
-          const r = await fetch("/auth/accounts");
+          const r = await adminFetch("/auth/accounts");
           const d = await r.json();
           if ((d.accounts?.length || 0) > prevCount) {
             cleanup();
@@ -110,7 +111,7 @@ export function useAccounts() {
         return;
       }
       try {
-        const resp = await fetch("/auth/code-relay", {
+        const resp = await adminFetch("/auth/code-relay", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ callbackUrl }),
@@ -135,7 +136,7 @@ export function useAccounts() {
   const deleteAccount = useCallback(
     async (id: string) => {
       try {
-        const resp = await fetch("/auth/accounts/" + encodeURIComponent(id), {
+        const resp = await adminFetch("/auth/accounts/" + encodeURIComponent(id), {
           method: "DELETE",
         });
         if (!resp.ok) {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
 import type { ProxyEntry } from "../types";
+import { adminFetch } from "../utils/admin-auth";
 
 export interface AssignmentAccount {
   id: string;
@@ -33,7 +34,7 @@ export function useProxyAssignments(): ProxyAssignmentsState {
 
   const refresh = useCallback(async () => {
     try {
-      const resp = await fetch("/api/proxies/assignments");
+      const resp = await adminFetch("/api/proxies/assignments");
       const data = await resp.json();
       setAccounts(data.accounts || []);
       setProxies(data.proxies || []);
@@ -50,7 +51,7 @@ export function useProxyAssignments(): ProxyAssignmentsState {
 
   const assignBulk = useCallback(
     async (assignments: Array<{ accountId: string; proxyId: string }>) => {
-      const resp = await fetch("/api/proxies/assign-bulk", {
+      const resp = await adminFetch("/api/proxies/assign-bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ assignments }),
@@ -66,7 +67,7 @@ export function useProxyAssignments(): ProxyAssignmentsState {
 
   const assignRule = useCallback(
     async (accountIds: string[], rule: string, targetProxyIds: string[]) => {
-      const resp = await fetch("/api/proxies/assign-rule", {
+      const resp = await adminFetch("/api/proxies/assign-rule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accountIds, rule, targetProxyIds }),
@@ -81,7 +82,7 @@ export function useProxyAssignments(): ProxyAssignmentsState {
   );
 
   const exportAssignments = useCallback(async (): Promise<Array<{ email: string; proxyId: string }>> => {
-    const resp = await fetch("/api/proxies/assignments/export");
+    const resp = await adminFetch("/api/proxies/assignments/export");
     if (!resp.ok) return [];
     const data: { assignments?: Array<{ email: string; proxyId: string }> } = await resp.json();
     return data.assignments || [];
@@ -89,7 +90,7 @@ export function useProxyAssignments(): ProxyAssignmentsState {
 
   const importPreview = useCallback(
     async (data: Array<{ email: string; proxyId: string }>): Promise<ImportDiff | null> => {
-      const resp = await fetch("/api/proxies/assignments/import", {
+      const resp = await adminFetch("/api/proxies/assignments/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ assignments: data }),
@@ -103,7 +104,7 @@ export function useProxyAssignments(): ProxyAssignmentsState {
 
   const applyImport = useCallback(
     async (assignments: Array<{ accountId: string; proxyId: string }>) => {
-      const resp = await fetch("/api/proxies/assignments/apply", {
+      const resp = await adminFetch("/api/proxies/assignments/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ assignments }),

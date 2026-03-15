@@ -11,26 +11,18 @@ import { buildHeaders } from "../fingerprint/manager.js";
 import { getUpdateState, checkForUpdate, isUpdateInProgress } from "../update-checker.js";
 import { getProxyInfo, canSelfUpdate, checkProxySelfUpdate, applyProxySelfUpdate, isProxyUpdateInProgress, getCachedProxyUpdateResult, getDeployMode } from "../self-update.js";
 import { mutateYaml } from "../utils/yaml-mutate.js";
-import { hideAdminSurface, requireAdminAccess } from "../middleware/access-control.js";
+import { requireAdminAccess } from "../middleware/access-control.js";
 
 export function createWebRoutes(accountPool: AccountPool): Hono {
   const app = new Hono();
 
   const publicDir = getPublicDir();
   const desktopPublicDir = getDesktopPublicDir();
-  const requireWebAdmin = (c: Parameters<typeof hideAdminSurface>[0]) => hideAdminSurface(c);
 
   // Serve Vite build assets (web)
-  app.use("/assets/*", async (c, next) => {
-    const denied = requireWebAdmin(c);
-    if (denied) return denied;
-    await next();
-  });
   app.use("/assets/*", serveStatic({ root: publicDir }));
 
   app.get("/", (c) => {
-    const denied = requireWebAdmin(c);
-    if (denied) return denied;
     try {
       const html = readFileSync(resolve(publicDir, "index.html"), "utf-8");
       return c.html(html);
@@ -44,19 +36,13 @@ export function createWebRoutes(accountPool: AccountPool): Hono {
   // Desktop UI — served at /desktop for Electron
   // Vite builds with base: "/desktop/" so request paths are /desktop/assets/...
   // but files live at public-desktop/assets/..., so strip the /desktop prefix
-  app.use("/desktop/assets/*", async (c, next) => {
-    const denied = requireWebAdmin(c);
-    if (denied) return denied;
-    await next();
-  });
+  app.use("/desktop/*", requireAdminAccess());
   app.use("/desktop/assets/*", serveStatic({
     root: desktopPublicDir,
     rewriteRequestPath: (path) => path.replace(/^\/desktop/, ""),
   }));
 
   app.get("/desktop", (c) => {
-    const denied = requireWebAdmin(c);
-    if (denied) return denied;
     try {
       const html = readFileSync(resolve(desktopPublicDir, "index.html"), "utf-8");
       return c.html(html);

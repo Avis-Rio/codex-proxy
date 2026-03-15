@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
+import { adminFetch, bearerFetch } from "../utils/admin-auth";
 
 export interface CatalogModel {
   id: string;
@@ -51,15 +52,15 @@ export function useStatus(accountCount: number) {
   const [selectedEffort, setSelectedEffort] = useState("medium");
   const [selectedSpeed, setSelectedSpeed] = useState<string | null>(null);
 
-  const loadModels = useCallback(async () => {
+  const loadModels = useCallback(async (proxyApiKey: string | null) => {
     try {
       // Fetch full catalog for effort info
-      const catalogResp = await fetch("/v1/models/catalog");
+      const catalogResp = await bearerFetch("/v1/models/catalog", proxyApiKey);
       const catalogData: CatalogModel[] = await catalogResp.json();
       setModelCatalog(catalogData);
 
       // Also fetch model list (includes aliases)
-      const resp = await fetch("/v1/models");
+      const resp = await bearerFetch("/v1/models", proxyApiKey);
       const data = await resp.json();
       const ids: string[] = data.data.map((m: { id: string }) => m.id);
       if (ids.length > 0) {
@@ -75,12 +76,12 @@ export function useStatus(accountCount: number) {
   useEffect(() => {
     async function loadStatus() {
       try {
-        const resp = await fetch("/auth/status");
+        const resp = await adminFetch("/auth/status");
         const data = await resp.json();
-        if (!data.authenticated) return;
+        if (!resp.ok || !data.authenticated) return;
         setBaseUrl(`${window.location.origin}/v1`);
         setApiKey(data.proxy_api_key || "any-string");
-        await loadModels();
+        await loadModels(data.proxy_api_key || null);
       } catch (err) {
         console.error("Status load error:", err);
       }

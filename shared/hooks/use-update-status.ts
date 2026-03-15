@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
+import { adminFetch } from "../utils/admin-auth";
 
 export interface UpdateStatus {
   proxy: {
@@ -106,7 +107,7 @@ export function useUpdateStatus() {
 
   const load = useCallback(async () => {
     try {
-      const resp = await fetch("/admin/update-status");
+      const resp = await adminFetch("/admin/update-status");
       if (resp.ok) {
         setStatus(await resp.json() as UpdateStatus);
       }
@@ -120,7 +121,7 @@ export function useUpdateStatus() {
     setError(null);
     setResult(null);
     try {
-      const resp = await fetch("/admin/check-update", { method: "POST" });
+      const resp = await adminFetch("/admin/check-update", { method: "POST" });
       const data = await resp.json() as CheckResult;
       if (!resp.ok) {
         setError("Check failed");
@@ -139,7 +140,7 @@ export function useUpdateStatus() {
     setApplying(true);
     setError(null);
     try {
-      const resp = await fetch("/admin/apply-update", { method: "POST" });
+      const resp = await adminFetch("/admin/apply-update", { method: "POST" });
       const data = await resp.json() as { started: boolean; restarting?: boolean; error?: string };
       if (!resp.ok || !data.started) {
         setError(data.error ?? "Apply failed");

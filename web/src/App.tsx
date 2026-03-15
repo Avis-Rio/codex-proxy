@@ -17,6 +17,7 @@ import { useAccounts } from "../../shared/hooks/use-accounts";
 import { useProxies } from "../../shared/hooks/use-proxies";
 import { useStatus } from "../../shared/hooks/use-status";
 import { useUpdateStatus } from "../../shared/hooks/use-update-status";
+import { bearerFetch, clearStoredAdminApiKey, getStoredAdminApiKey, setStoredAdminApiKey } from "../../shared/utils/admin-auth";
 import { useI18n } from "../../shared/i18n/context";
 
 function useUpdateMessage() {
@@ -66,7 +67,7 @@ function useUpdateMessage() {
   return { ...update, msg, color, hasUpdate, proxyUpdateInfo };
 }
 
-function Dashboard() {
+function DashboardContent({ onAdminLogout }: { onAdminLogout: () => void }) {
   const accounts = useAccounts();
   const proxies = useProxies();
   const status = useStatus(accounts.list.length);
@@ -74,7 +75,6 @@ function Dashboard() {
   const [showModal, setShowModal] = useState(false);
   const prevUpdateAvailable = useRef(false);
 
-  // Auto-open modal when update becomes available after a check
   useEffect(() => {
     if (update.hasUpdate && !prevUpdateAvailable.current) {
       setShowModal(true);
@@ -93,6 +93,7 @@ function Dashboard() {
         onAddAccount={accounts.startAdd}
         onCheckUpdate={update.checkForUpdate}
         onOpenUpdateModal={() => setShowModal(true)}
+        onAdminLogout={onAdminLogout}
         checking={update.checking}
         updateStatusMsg={update.msg}
         updateStatusColor={update.color}
@@ -166,6 +167,73 @@ function Dashboard() {
   );
 }
 
+function AdminLogin({
+  checking,
+  error,
+  onSubmit,
+}: {
+  checking: boolean;
+  error: string | null;
+  onSubmit: (key: string) => Promise<void>;
+}) {
+  const [value, setValue] = useState("");
+
+  return (
+    <div class="min-h-screen bg-slate-50 dark:bg-bg-dark text-slate-900 dark:text-text-main flex items-center justify-center px-4">
+      <div class="w-full max-w-md rounded-2xl border border-gray-200 dark:border-border-dark bg-white dark:bg-card-dark shadow-xl p-6">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="flex items-center justify-center size-10 rounded-full bg-primary/10 text-primary border border-primary/20">
+            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2.25m6.364-8.614a9 9 0 11-12.728 0 9 9 0 0112.728 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 10-6 0c0 .928.42 1.757 1.08 2.307.53.441.92 1.063.92 1.743v.45h2v-.45c0-.68.39-1.302.92-1.743A2.99 2.99 0 0015 10.5z" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold tracking-tight">Codex Proxy Admin</h1>
+            <p class="text-sm text-slate-500 dark:text-text-dim">Use your ADMIN_API_KEY to unlock the management console.</p>
+          </div>
+        </div>
+
+        <form
+          class="space-y-4"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            await onSubmit(value);
+          }}
+        >
+          <div>
+            <label class="block text-sm font-medium mb-2">Admin API Key</label>
+            <input
+              type="password"
+              value={value}
+              onInput={(e) => setValue((e.target as HTMLInputElement).value)}
+              class="w-full rounded-xl border border-gray-200 dark:border-border-dark bg-white dark:bg-bg-dark px-4 py-3 outline-none focus:ring-2 focus:ring-primary/40"
+              placeholder="Enter ADMIN_API_KEY"
+              autoComplete="current-password"
+            />
+          </div>
+          {error && (
+            <div class="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
+              {error}
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={checking || !value.trim()}
+            class="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {checking ? "Verifying..." : "Unlock Console"}
+          </button>
+        </form>
+
+        <p class="mt-4 text-xs text-slate-500 dark:text-text-dim">
+          This key is stored only in your current browser so the admin UI can call protected routes.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function useHash(): string {
   const [hash, setHash] = useState(location.hash);
   useEffect(() => {
@@ -179,17 +247,70 @@ function useHash(): string {
 export function App() {
   const hash = useHash();
   const isProxySettings = hash === "#/proxy-settings";
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
+  const [adminReady, setAdminReady] = useState(false);
+  const [adminError, setAdminError] = useState<string | null>(null);
+
+  const verifyAdminKey = async (key: string, persist: boolean) => {
+    setCheckingAdmin(true);
+    setAdminError(null);
+    try {
+      const resp = await bearerFetch("/auth/status", key, { signal: AbortSignal.timeout(5000) });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        throw new Error((data as { error?: string }).error ?? `HTTP ${resp.status}`);
+      }
+      if (persist) {
+        setStoredAdminApiKey(key);
+      }
+      setAdminReady(true);
+    } catch (err) {
+      if (persist) {
+        clearStoredAdminApiKey();
+      }
+      setAdminReady(false);
+      setAdminError(err instanceof Error ? err.message : "Invalid admin key");
+    } finally {
+      setCheckingAdmin(false);
+    }
+  };
+
+  useEffect(() => {
+    const stored = getStoredAdminApiKey();
+    if (!stored) {
+      setCheckingAdmin(false);
+      setAdminReady(false);
+      return;
+    }
+    verifyAdminKey(stored, false);
+  }, []);
+
+  const logoutAdmin = () => {
+    clearStoredAdminApiKey();
+    setAdminReady(false);
+    setAdminError(null);
+  };
 
   return (
     <I18nProvider>
       <ThemeProvider>
-        {isProxySettings ? <ProxySettingsPage /> : <Dashboard />}
+        {!adminReady ? (
+          <AdminLogin
+            checking={checkingAdmin}
+            error={adminError}
+            onSubmit={(key) => verifyAdminKey(key, true)}
+          />
+        ) : isProxySettings ? (
+          <ProxySettingsPage onAdminLogout={logoutAdmin} />
+        ) : (
+          <DashboardContent onAdminLogout={logoutAdmin} />
+        )}
       </ThemeProvider>
     </I18nProvider>
   );
 }
 
-function ProxySettingsPage() {
+function ProxySettingsPage({ onAdminLogout }: { onAdminLogout: () => void }) {
   const update = useUpdateMessage();
 
   return (
@@ -197,6 +318,7 @@ function ProxySettingsPage() {
       <Header
         onAddAccount={() => { location.hash = ""; }}
         onCheckUpdate={update.checkForUpdate}
+        onAdminLogout={onAdminLogout}
         checking={update.checking}
         updateStatusMsg={update.msg}
         updateStatusColor={update.color}
