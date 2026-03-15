@@ -93,6 +93,6 @@ export function requireAdminAccess(): MiddlewareHandler {
   };
 }
 
-export function hideAdminSurface(c: Context): Response | null {
+export function hideAdminSurface(c: Context): Response | Promise<Response> | null {
   return canAccessAdmin(c) ? null : c.notFound();
 }
