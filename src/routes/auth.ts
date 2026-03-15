@@ -3,6 +3,7 @@ import type { AccountPool } from "../auth/account-pool.js";
 import type { RefreshScheduler } from "../auth/refresh-scheduler.js";
 import { validateManualToken } from "../auth/chatgpt-oauth.js";
 import { getConfig } from "../config.js";
+import { requireAdminAccess } from "../middleware/access-control.js";
 import {
   startOAuthFlow,
   consumeSession,
@@ -19,6 +20,7 @@ export function createAuthRoutes(
   scheduler: RefreshScheduler,
 ): Hono {
   const app = new Hono();
+  app.use("/auth/*", requireAdminAccess());
 
   // Auth status (JSON) — pool-level summary
   app.get("/auth/status", (c) => {

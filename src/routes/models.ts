@@ -3,7 +3,9 @@
  */
 
 import { Hono } from "hono";
+import type { AccountPool } from "../auth/account-pool.js";
 import type { OpenAIModel, OpenAIModelList } from "../types/openai.js";
+import { requireAdminAccess, requireProxyApiAccess } from "../middleware/access-control.js";
 import {
   getModelCatalog,
   getModelAliases,
@@ -26,8 +28,10 @@ function toOpenAIModel(info: CodexModelInfo): OpenAIModel {
   };
 }
 
-export function createModelRoutes(): Hono {
+export function createModelRoutes(accountPool: AccountPool): Hono {
   const app = new Hono();
+  app.use("/v1/models*", requireProxyApiAccess((key) => accountPool.validateProxyApiKey(key)));
+  app.use("/debug/models", requireAdminAccess());
 
   app.get("/v1/models", (c) => {
     const catalog = getModelCatalog();

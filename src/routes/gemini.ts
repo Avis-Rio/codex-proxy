@@ -25,6 +25,7 @@ import {
   handleProxyRequest,
   type FormatAdapter,
 } from "./shared/proxy-handler.js";
+import { requireProxyApiAccess } from "../middleware/access-control.js";
 
 function makeError(
   code: number,
@@ -77,6 +78,7 @@ export function createGeminiRoutes(
   proxyPool?: ProxyPool,
 ): Hono {
   const app = new Hono();
+  app.use("/v1beta/models*", requireProxyApiAccess((key) => accountPool.validateProxyApiKey(key)));
 
   // Handle both generateContent and streamGenerateContent
   app.post("/v1beta/models/:modelAction", async (c) => {

@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { getConnInfo } from "@hono/node-server/conninfo";
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import type { AccountPool } from "../auth/account-pool.js";
@@ -12,17 +11,26 @@ import { buildHeaders } from "../fingerprint/manager.js";
 import { getUpdateState, checkForUpdate, isUpdateInProgress } from "../update-checker.js";
 import { getProxyInfo, canSelfUpdate, checkProxySelfUpdate, applyProxySelfUpdate, isProxyUpdateInProgress, getCachedProxyUpdateResult, getDeployMode } from "../self-update.js";
 import { mutateYaml } from "../utils/yaml-mutate.js";
+import { hideAdminSurface, requireAdminAccess } from "../middleware/access-control.js";
 
 export function createWebRoutes(accountPool: AccountPool): Hono {
   const app = new Hono();
 
   const publicDir = getPublicDir();
   const desktopPublicDir = getDesktopPublicDir();
+  const requireWebAdmin = (c: Parameters<typeof hideAdminSurface>[0]) => hideAdminSurface(c);
 
   // Serve Vite build assets (web)
+  app.use("/assets/*", async (c, next) => {
+    const denied = requireWebAdmin(c);
+    if (denied) return denied;
+    await next();
+  });
   app.use("/assets/*", serveStatic({ root: publicDir }));
 
   app.get("/", (c) => {
+    const denied = requireWebAdmin(c);
+    if (denied) return denied;
     try {
       const html = readFileSync(resolve(publicDir, "index.html"), "utf-8");
       return c.html(html);
@@ -36,12 +44,19 @@ export function createWebRoutes(accountPool: AccountPool): Hono {
   // Desktop UI — served at /desktop for Electron
   // Vite builds with base: "/desktop/" so request paths are /desktop/assets/...
   // but files live at public-desktop/assets/..., so strip the /desktop prefix
+  app.use("/desktop/assets/*", async (c, next) => {
+    const denied = requireWebAdmin(c);
+    if (denied) return denied;
+    await next();
+  });
   app.use("/desktop/assets/*", serveStatic({
     root: desktopPublicDir,
     rewriteRequestPath: (path) => path.replace(/^\/desktop/, ""),
   }));
 
   app.get("/desktop", (c) => {
+    const denied = requireWebAdmin(c);
+    if (denied) return denied;
     try {
       const html = readFileSync(resolve(desktopPublicDir, "index.html"), "utf-8");
       return c.html(html);
@@ -53,26 +68,15 @@ export function createWebRoutes(accountPool: AccountPool): Hono {
   });
 
   app.get("/health", async (c) => {
-    const authenticated = accountPool.isAuthenticated();
-    const poolSummary = accountPool.getPoolSummary();
     return c.json({
       status: "ok",
-      authenticated,
-      pool: { total: poolSummary.total, active: poolSummary.active },
       timestamp: new Date().toISOString(),
     });
   });
 
-  app.get("/debug/fingerprint", (c) => {
-    // Only allow in development or from localhost
-    const isProduction = process.env.NODE_ENV === "production";
-    const remoteAddr = getConnInfo(c).remote.address ?? "";
-    const isLocalhost = remoteAddr === "" || remoteAddr === "127.0.0.1" || remoteAddr === "::1" || remoteAddr === "::ffff:127.0.0.1";
-    if (isProduction && !isLocalhost) {
-      c.status(404);
-      return c.json({ error: { message: "Not found", type: "invalid_request_error" } });
-    }
+  app.use("/debug/*", requireAdminAccess());
 
+  app.get("/debug/fingerprint", (c) => {
     const config = getConfig();
     const fp = getFingerprint();
 
@@ -128,13 +132,6 @@ export function createWebRoutes(accountPool: AccountPool): Hono {
   });
 
   app.get("/debug/diagnostics", (c) => {
-    const remoteAddr = getConnInfo(c).remote.address ?? "";
-    const isLocalhost = remoteAddr === "" || remoteAddr === "127.0.0.1" || remoteAddr === "::1" || remoteAddr === "::ffff:127.0.0.1";
-    if (process.env.NODE_ENV === "production" && !isLocalhost) {
-      c.status(404);
-      return c.json({ error: { message: "Not found", type: "invalid_request_error" } });
-    }
-
     const transport = getTransportInfo();
     const curl = getCurlDiagnostics();
     const poolSummary = accountPool.getPoolSummary();
@@ -174,6 +171,7 @@ export function createWebRoutes(accountPool: AccountPool): Hono {
   });
 
   // --- Update management endpoints ---
+  app.use("/admin/*", requireAdminAccess());
 
   app.get("/admin/update-status", (c) => {
     const proxyInfo = getProxyInfo();

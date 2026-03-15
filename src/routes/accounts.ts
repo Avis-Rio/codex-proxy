@@ -19,6 +19,7 @@ import type { RefreshScheduler } from "../auth/refresh-scheduler.js";
 import { validateManualToken } from "../auth/chatgpt-oauth.js";
 import { startOAuthFlow } from "../auth/oauth-pkce.js";
 import { getConfig } from "../config.js";
+import { requireAdminAccess } from "../middleware/access-control.js";
 import { CodexApi } from "../proxy/codex-api.js";
 import type { CodexUsageResponse } from "../proxy/codex-api.js";
 import type { CodexQuota, AccountInfo } from "../auth/types.js";
@@ -55,6 +56,7 @@ export function createAccountRoutes(
   proxyPool?: ProxyPool,
 ): Hono {
   const app = new Hono();
+  app.use("/auth/accounts*", requireAdminAccess());
 
   /** Helper: build a CodexApi with cookie + proxy support. */
   function makeApi(entryId: string, token: string, accountId: string | null): CodexApi {

@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: codex-proxy
+    runtime: node
+    plan: starter
+    rootDir: .
+    buildCommand: npm ci && cd web && npm ci && cd .. && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: PROXY_API_KEY
+        sync: false
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: HTTPS_PROXY
+        sync: false

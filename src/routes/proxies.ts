@@ -17,9 +17,11 @@
 import { Hono } from "hono";
 import type { ProxyPool } from "../proxy/proxy-pool.js";
 import type { AccountPool } from "../auth/account-pool.js";
+import { requireAdminAccess } from "../middleware/access-control.js";
 
 export function createProxyRoutes(proxyPool: ProxyPool, accountPool: AccountPool): Hono {
   const app = new Hono();
+  app.use("/api/proxies*", requireAdminAccess());
 
   // List all proxies + assignments (credentials masked)
   app.get("/api/proxies", (c) => {

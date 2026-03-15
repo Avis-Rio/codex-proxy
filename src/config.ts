@@ -39,6 +39,7 @@ const ConfigSchema = z.object({
     host: z.string().default("0.0.0.0"),
     port: z.number().min(1).max(65535).default(8080),
     proxy_api_key: z.string().nullable().default(null),
+    admin_api_key: z.string().nullable().default(null),
   }),
   session: z.object({
     ttl_minutes: z.number().min(1).default(60),
@@ -88,6 +89,14 @@ function applyEnvOverrides(raw: Record<string, unknown>): Record<string, unknown
     if (!isNaN(parsed)) {
       (raw.server as Record<string, unknown>).port = parsed;
     }
+  }
+  const proxyApiKey = process.env.PROXY_API_KEY?.trim();
+  if (proxyApiKey) {
+    (raw.server as Record<string, unknown>).proxy_api_key = proxyApiKey;
+  }
+  const adminApiKey = process.env.ADMIN_API_KEY?.trim();
+  if (adminApiKey) {
+    (raw.server as Record<string, unknown>).admin_api_key = adminApiKey;
   }
   const proxyEnv = process.env.HTTPS_PROXY || process.env.https_proxy;
   if (proxyEnv) {
